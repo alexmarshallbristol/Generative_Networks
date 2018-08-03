@@ -452,7 +452,7 @@ class GAN(object):
 				myfile.write('%d, %.3f time: %.2f \n'%(step, bdt_reduced_chi2, time_so_far))
 		else:
 			with open("test_output/rchi2_progress.txt", "a") as myfile:
-				myfile.write('%d, %.3f %.3f time: %.2f \n'%(step, bdt_reduced_chi2, bdt_sum_overlap_list, time_so_far))
+				myfile.write('%d, %.3f %.3f time: %.2f \n'%(step, bdt_reduced_chi2, sum_overlap, time_so_far))
 
 		return bdt_rchi2_list, bdt_sum_overlap_list
 
