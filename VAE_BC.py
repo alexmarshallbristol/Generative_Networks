@@ -19,8 +19,8 @@ from sklearn.ensemble import GradientBoostingClassifier, AdaBoostClassifier
 from matplotlib.colors import LogNorm
 from keras.models import Model, Sequential
 
-file_number = 0
-blue_crystal = False
+file_number = 22
+blue_crystal = True
 include_batchnorm_and_dropout = True
 # Hyperparameters
 
@@ -211,13 +211,15 @@ vae.compile(optimizer=optimizer, loss=vae_loss)
 vae.summary()
 
 if blue_crystal == True:
-    X_train = np.load('/mnt/storage/scratch/am13743/gan_training_data/sample_neg13_x_x_broad.npy')
+    X_train = np.load('/mnt/storage/scratch/am13743/gan_training_data_weights/sample_neg13_x_x_broad.npy')
 else:
     X_train = np.load('/Users/am13743/Desktop/GANs/thomas sample/sample_neg13_x_x_broad.npy')
 
 muon_weights, X_train = np.split(X_train, [1], axis=1)
 
 muon_weights = np.squeeze(muon_weights)
+
+X_train = np.squeeze(X_train)
 
 for xx in range(0, np.shape(X_train)[0]):
     for y in range(0, 6):
