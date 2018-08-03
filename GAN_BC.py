@@ -7,7 +7,7 @@ from keras.layers import Input, Dense, Reshape, Flatten, Dropout, LocallyConnect
 from keras.layers import BatchNormalization
 from keras.layers.advanced_activations import LeakyReLU
 from keras.models import Sequential
-from keras.optimizers import Adam, RMSpro
+from keras.optimizers import Adam, RMSprop
 import random
 import math
 import matplotlib as mpl
