@@ -1,6 +1,3 @@
-# -*- coding: utf-8 -*-
-""" Simple implementation of Generative Adversarial Neural Network """
-
 import numpy as np
 from keras.datasets import mnist
 from keras.layers import Input, Dense, Reshape, Flatten, Dropout, LocallyConnected2D, Conv2D
