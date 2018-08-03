@@ -4,7 +4,8 @@ mpl.use('TkAgg')
 mpl.use('Agg')
 import matplotlib.pyplot as plt
 from scipy.stats import norm
-from keras.layers import Input, Dense, Lambda
+from keras.layers import Input, Dense, Reshape, Flatten, Dropout, Lambda
+from keras.layers import BatchNormalization
 from keras.models import Model
 from keras import backend as K
 from keras import objectives
@@ -19,8 +20,8 @@ from matplotlib.colors import LogNorm
 from keras.models import Model, Sequential
 
 file_number = 0
-blue_crystal = True
-
+blue_crystal = False
+include_batchnorm_and_dropout = True
 # Hyperparameters
 
 original_dim = 6
@@ -81,37 +82,108 @@ learning_rate = results.learning_rate
 
 loss = np.empty((0,2))
 
-if layersD == 1:
-    decoder = Sequential([
-        Dense(intermediate_dimD, input_dim=latent_dim, activation='relu'),
-        Dense(original_dim, activation='sigmoid')
-    ])
-elif layersD == 2:
-    decoder = Sequential([
-        Dense(intermediate_dimD, input_dim=latent_dim, activation='relu'),
-        Dense(intermediate_dimD, activation='relu'),
-        Dense(original_dim, activation='sigmoid')
-    ])
-elif layersD == 3:
-    decoder = Sequential([
-        Dense(intermediate_dimD, input_dim=latent_dim, activation='relu'),
-        Dense(intermediate_dimD, activation='relu'),
-        Dense(intermediate_dimD, activation='relu'),
-        Dense(original_dim, activation='sigmoid')
-    ])
+if include_batchnorm_and_dropout == False:
+    if layersD == 1:
+        decoder = Sequential([
+            Dense(intermediate_dimD, input_dim=latent_dim, activation='relu'),
+            Dense(original_dim, activation='sigmoid')
+        ])
+    elif layersD == 2:
+        decoder = Sequential([
+            Dense(intermediate_dimD, input_dim=latent_dim, activation='relu'),
+            Dense(intermediate_dimD, activation='relu'),
+            Dense(original_dim, activation='sigmoid')
+        ])
+    elif layersD == 3:
+        decoder = Sequential([
+            Dense(intermediate_dimD, input_dim=latent_dim, activation='relu'),
+            Dense(intermediate_dimD, activation='relu'),
+            Dense(intermediate_dimD, activation='relu'),
+            Dense(original_dim, activation='sigmoid')
+        ])
 
-if layersE == 1:
-    x = Input(shape=(original_dim,))
-    h = Dense(intermediate_dimE, activation='relu')(x)
-if layersE == 2:
-    x = Input(shape=(original_dim,))
-    h_2 = Dense(intermediate_dimE, activation='relu')(x)
-    h = Dense(intermediate_dimE, activation='relu')(h_2)
-if layersE == 3:
-    x = Input(shape=(original_dim,))
-    h_2 = Dense(intermediate_dimE, activation='relu')(x)
-    h_3 = Dense(intermediate_dimE, activation='relu')(h_2)
-    h = Dense(intermediate_dimE, activation='relu')(h_3)
+    if layersE == 1:
+        x = Input(shape=(original_dim,))
+        h = Dense(intermediate_dimE, activation='relu')(x)
+    if layersE == 2:
+        x = Input(shape=(original_dim,))
+        h_2 = Dense(intermediate_dimE, activation='relu')(x)
+        h = Dense(intermediate_dimE, activation='relu')(h_2)
+    if layersE == 3:
+        x = Input(shape=(original_dim,))
+        h_2 = Dense(intermediate_dimE, activation='relu')(x)
+        h_3 = Dense(intermediate_dimE, activation='relu')(h_2)
+        h = Dense(intermediate_dimE, activation='relu')(h_3)
+else:
+    if layersD == 1:
+        decoder = Sequential([
+            Dense(intermediate_dimD, input_dim=latent_dim, activation='relu'),
+            Dropout(0.25),
+            BatchNormalization(momentum=0.8),
+            Dense(original_dim, activation='sigmoid')
+        ])
+    elif layersD == 2:
+        decoder = Sequential([
+            Dense(intermediate_dimD, input_dim=latent_dim, activation='relu'),
+            Dropout(0.25),
+            BatchNormalization(momentum=0.8),
+            Dense(intermediate_dimD, activation='relu'),
+            Dropout(0.25),
+            BatchNormalization(momentum=0.8),
+            Dense(original_dim, activation='sigmoid')
+        ])
+    elif layersD == 3:
+        decoder = Sequential([
+            Dense(intermediate_dimD, input_dim=latent_dim, activation='relu'),
+            Dropout(0.25),
+            BatchNormalization(momentum=0.8),
+            Dense(intermediate_dimD, activation='relu'),
+            Dropout(0.25),
+            BatchNormalization(momentum=0.8),
+            Dense(intermediate_dimD, activation='relu'),
+            Dropout(0.25),
+            BatchNormalization(momentum=0.8),
+            Dense(original_dim, activation='sigmoid')
+        ])
+
+    if layersE == 1:
+        x = Input(shape=(original_dim,))
+
+        x_2 = Dropout(0.25)(x)
+        x_3 = BatchNormalization(momentum=0.8)(x_2)
+
+        h = Dense(intermediate_dimE, activation='relu')(x_3)
+    if layersE == 2:
+        x = Input(shape=(original_dim,))
+
+        x_2 = Dropout(0.25)(x)
+        x_3 = BatchNormalization(momentum=0.8)(x_2)
+
+        h_2 = Dense(intermediate_dimE, activation='relu')(x_3)
+
+        x_4 = Dropout(0.25)(h_2)
+        h_3 = BatchNormalization(momentum=0.8)(x_4)
+
+        h = Dense(intermediate_dimE, activation='relu')(h_3)
+    if layersE == 3:
+        x = Input(shape=(original_dim,))
+
+        x_2 = Dropout(0.25)(x)
+        x_3 = BatchNormalization(momentum=0.8)(x_2)
+
+        h_2 = Dense(intermediate_dimE, activation='relu')(x_3)
+
+        x_6 = Dropout(0.25)(h_2)
+        x_7 = BatchNormalization(momentum=0.8)(x_6)
+
+        h_3 = Dense(intermediate_dimE, activation='relu')(x_7)
+
+        x_8 = Dropout(0.25)(h_3)
+        x_9 = BatchNormalization(momentum=0.8)(x_8)
+
+        h = Dense(intermediate_dimE, activation='relu')(x_9)
+
+
 
 z_mean = Dense(latent_dim)(h)
 z_log_var = Dense(latent_dim)(h)
@@ -136,10 +208,16 @@ vae = Model(x, x_decoded_mean)
 optimizer = Adam(lr=learning_rate, beta_1=0.5, decay=8e-8, amsgrad=False)
 vae.compile(optimizer=optimizer, loss=vae_loss)
 
+vae.summary()
+
 if blue_crystal == True:
     X_train = np.load('/mnt/storage/scratch/am13743/gan_training_data/sample_neg13_x_x_broad.npy')
 else:
-    X_train = np.load('sample_neg13_x_x_broad.npy')
+    X_train = np.load('/Users/am13743/Desktop/GANs/thomas sample/sample_neg13_x_x_broad.npy')
+
+muon_weights, X_train = np.split(X_train, [1], axis=1)
+
+muon_weights = np.squeeze(muon_weights)
 
 for xx in range(0, np.shape(X_train)[0]):
     for y in range(0, 6):
@@ -148,12 +226,11 @@ for xx in range(0, np.shape(X_train)[0]):
 x_test = X_train[:10000]
 y_test = x_test
 X_train = X_train[:1880000] 
+muon_weights = muon_weights[:1880000]
+muon_weights = muon_weights/np.sum(muon_weights)
+
+list_for_np_choice = np.arange(np.shape(X_train)[0]) 
 y_train = X_train
-
-gaussian_values_for_gen = np.empty((4,2))
-
-rchi2_save_values = np.empty((0,12))
-
 
 bdt_sum_overlap_list = np.empty((0,2))
 bdt_rchi2_list = np.empty((0,2))
@@ -162,12 +239,15 @@ t0 = time.time()
 
 for epoch in range(0, epochs):
 
-    random_index = np.random.randint(0, len(X_train) - batch)
-    legit_images = X_train[random_index : random_index + int(batch)].reshape(int(batch), 6)
+    # random_index = np.random.randint(0, len(X_train) - batch)
+    # legit_images = X_train[random_index : random_index + int(batch)].reshape(int(batch), 6)
+
+    random_indicies = np.random.choice(list_for_np_choice, size=batch, p=muon_weights, replace=False)
+    legit_images = X_train[random_indicies].reshape(int(batch), 6)
 
     vae_loss_value = vae.train_on_batch(legit_images, legit_images)
 
-    if epoch % 10000 == 0 :print('Epoch:',epoch,', VAE Loss:',vae_loss_value)
+    if epoch % 100 == 0 :print('Epoch:',epoch,', VAE Loss:',vae_loss_value)
 
     loss = np.append(loss, [[epoch, vae_loss_value]], axis=0)
 
