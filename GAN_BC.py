@@ -220,6 +220,7 @@ class GAN(object):
 		# Start best_bdt_rchi2 value extremely high to be sure early values are lower.
 
 		best_bdt_rchi2 = 1E30
+		best_bdt_overlap = 1E30
 
 		list_for_np_choice = np.arange(np.shape(X_train)[0]) 
 		# Simple list of ordered integers that will be fed to np.random.choice (only takes 1D array)
@@ -290,18 +291,32 @@ class GAN(object):
 				bdt_rchi2_list, bdt_sum_overlap_list = self.plot_images(bdt_rchi2_list, t0, bdt_sum_overlap_list, list_for_np_choice, muon_weights, save2file=True, step=cnt)
 
 				if bdt_rchi2_list[-1][1] < best_bdt_rchi2:
-					print('Saving best.')
+					print('Saving best rchi2.')
 					if blue_crystal == True:
 						with open("/mnt/storage/scratch/am13743/low_memory_gan_out/%d/test_output/models/best_bdt_rchi2.txt"%file_number, "a") as myfile:
-							myfile.write('\n %d, %.3f %.3f'%(cnt, bdt_rchi2_list[-1][1], bdt_sum_overlap_list[-1][1]))
+							myfile.write('\n %d, %.3f'%(cnt, bdt_rchi2_list[-1][1]))
 					else:
 						with open("test_output/models/best_bdt_rchi2.txt", "a") as myfile:
-							myfile.write('\n %d, %.3f %.3f'%(cnt, bdt_rchi2_list[-1][1], bdt_sum_overlap_list[-1][1]))
+							myfile.write('\n %d, %.3f'%(cnt, bdt_rchi2_list[-1][1]))
 					if blue_crystal == True:
-						self.G.save('/mnt/storage/scratch/am13743/low_memory_gan_out/%d/test_output/models/Generator_neg13_x_x.h5'%file_number)
+						self.G.save('/mnt/storage/scratch/am13743/low_memory_gan_out/%d/test_output/models/Generator_neg13_x_x_best_rchi2.h5'%file_number)
 					else:
 						self.G.save('test_output/models/Generator_neg13_x_x.h5')
 					best_bdt_rchi2 = bdt_rchi2_list[-1][1]
+
+				if bdt_sum_overlap_list[-1][1] < best_bdt_overlap:
+					print('Saving best overlap.')
+					if blue_crystal == True:
+						with open("/mnt/storage/scratch/am13743/low_memory_gan_out/%d/test_output/models/best_bdt_overlap.txt"%file_number, "a") as myfile:
+							myfile.write('\n %d, %.3f'%(cnt, bdt_sum_overlap_list[-1][1]))
+					else:
+						with open("test_output/models/best_bdt_overlap.txt", "a") as myfile:
+							myfile.write('\n %d, %.3f'%(cnt, bdt_sum_overlap_list[-1][1]))
+					if blue_crystal == True:
+						self.G.save('/mnt/storage/scratch/am13743/low_memory_gan_out/%d/test_output/models/Generator_neg13_x_x_best_overlap.h5'%file_number)
+					else:
+						self.G.save('test_output/models/Generator_neg13_x_x.h5')
+					best_bdt_overlap = bdt_sum_overlap_list[-1][1]
 
 	def plot_images(self, bdt_rchi2_list, t0, bdt_sum_overlap_list, list_for_np_choice, muon_weights, save2file=False, samples=16, step=0):
 
@@ -440,7 +455,7 @@ class GAN(object):
 				myfile.write('%d, %.3f time: %.2f \n'%(step, bdt_reduced_chi2, time_so_far))
 		else:
 			with open("test_output/rchi2_progress.txt", "a") as myfile:
-				myfile.write('%d, %.3f time: %.2f \n'%(step, bdt_reduced_chi2, time_so_far))
+				myfile.write('%d, %.3f %.3f time: %.2f \n'%(step, bdt_reduced_chi2, bdt_sum_overlap_list, time_so_far))
 
 		return bdt_rchi2_list, bdt_sum_overlap_list
 
