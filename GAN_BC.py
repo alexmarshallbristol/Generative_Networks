@@ -22,7 +22,7 @@ from matplotlib.colors import LogNorm
 
 file_number = 0
 
-blue_crystal = False
+blue_crystal = True
 
 _EPSILON = K.epsilon() # 10^-7 by default. Epsilon is used as a small constant to avoid ever dividing by zero. 
 
@@ -460,7 +460,7 @@ class GAN(object):
 if __name__ == '__main__':
 
 	if blue_crystal == True:
-		X_train = np.load('/mnt/storage/scratch/am13743/gan_training_data/sample_neg13_x_x_broad.npy')
+		X_train = np.load('/mnt/storage/scratch/am13743/gan_training_data_weights/sample_neg13_x_x_broad.npy')
 	else:
 		X_train = np.load('sample_neg13_x_x_broad.npy')
 
