@@ -355,6 +355,7 @@ class GAN(object):
 
 
 		plt.hist([out_real[:,1],out_fake[:,1]], bins = 100,label=['real','gen'], histtype='step')
+		plt.xlabel('Output of BDT')
 		plt.legend(loc='upper right')
 		if blue_crystal == True:
 			plt.savefig('/mnt/storage/scratch/am13743/low_memory_gan_out/%d/test_output/bdt/BDT_out_%d.png'%(file_number,step), bbox_inches='tight')
@@ -383,6 +384,8 @@ class GAN(object):
 		bdt_rchi2_list = np.append(bdt_rchi2_list, [[step, bdt_reduced_chi2]], axis=0)
 
 		plt.plot(bdt_rchi2_list[:,0], bdt_rchi2_list[:,1])
+		plt.xlabel('Training steps')
+		plt.ylabel('rChi2')
 		plt.yscale('log', nonposy='clip')
 		if blue_crystal == True:
 			plt.savefig('/mnt/storage/scratch/am13743/low_memory_gan_out/%d/test_output/bdt_rchi2.png'%file_number, bbox_inches='tight')
@@ -403,6 +406,8 @@ class GAN(object):
 		bdt_sum_overlap_list = np.append(bdt_sum_overlap_list, [[step, sum_overlap]], axis=0)
 
 		plt.plot(bdt_sum_overlap_list[:,0], bdt_sum_overlap_list[:,1])
+		plt.xlabel('Trianing steps')
+		plt.ylabel('Overlap')
 		plt.yscale('log', nonposy='clip')
 		if blue_crystal == True:
 			plt.savefig('/mnt/storage/scratch/am13743/low_memory_gan_out/%d/test_output/bdt_overlap.png'%file_number, bbox_inches='tight')
@@ -410,34 +415,45 @@ class GAN(object):
 			plt.savefig('test_output/bdt_overlap.png', bbox_inches='tight')
 		plt.close('all')
 
-		def compare_cross_hists_2d_hist(index_1, index_2):
+
+		plot_data = np.concatenate((real_training_data, real_test_data))
+
+		def compare_cross_hists_2d_hist(index_1, index_2, axis_titles):
 			plt.subplot(1,2,1)
 			plt.title('Real Properties')
-			plt.hist2d(X_train[:100000,index_1],X_train[:100000,index_2], bins = 100, norm=LogNorm(), range=[[-1,1],[-1,1]])
+			plt.hist2d(plot_data[:,index_1],plot_data[:,index_2], bins = 100, norm=LogNorm(), range=[[-1,1],[-1,1]])
+			plt.xlabel(axis_titles[index_1])
+			plt.ylabel(axis_titles[index_2])
 			plt.subplot(1,2,2)
 			plt.title('Generated blur')
 			plt.hist2d(images[:,0,index_1,0],images[:,0,index_2,0], bins = 100, norm=LogNorm(), range=[[-1,1],[-1,1]])
+			plt.xlabel(axis_titles[index_1])
+			plt.ylabel(axis_titles[index_2])
 			if blue_crystal == True:
 				plt.savefig('/mnt/storage/scratch/am13743/low_memory_gan_out/%d/test_output/compare_cross_blur_%d_%d_2D.png'%(file_number,index_1, index_2), bbox_inches='tight')
 			else:
 				plt.savefig('test_output/compare_cross_blur_%d_%d_2D.png'%(index_1, index_2), bbox_inches='tight')
 			plt.close('all')
 
+		axis_titles = ['StartX', 'StartY', 'StartZ', 'Px', 'Py', 'Pz']
+
 		for x in range(0,6):
 			for y in range(x+1,6):
-				compare_cross_hists_2d_hist(x,y)
+				compare_cross_hists_2d_hist(x,y, axis_titles)
+
+		# for index in range(0, 6):
+		# 	plt.hist([plot_data[:,index],images[:,0,index,0]], bins = 250,label=['real','gen'], histtype='step')
+		# 	plt.xlabel(axis_titles[index])
+		# 	plt.legend(loc='upper right')
+		# 	if blue_crystal == True:
+		# 		plt.savefig('/mnt/storage/scratch/am13743/low_memory_gan_out/%d/test_output/%d/%d.png'%(file_number,index,step), bbox_inches='tight')
+		# 	else:
+		# 		plt.savefig('test_output/%d/%d.png'%(index,step), bbox_inches='tight')
+		# 	plt.close('all')
 
 		for index in range(0, 6):
-			plt.hist([X_train[:100000,index],images[:,0,index,0]], bins = 250,label=['real','gen'], histtype='step')
-			plt.legend(loc='upper right')
-			if blue_crystal == True:
-				plt.savefig('/mnt/storage/scratch/am13743/low_memory_gan_out/%d/test_output/%d/%d.png'%(file_number,index,step), bbox_inches='tight')
-			else:
-				plt.savefig('test_output/%d/%d.png'%(index,step), bbox_inches='tight')
-			plt.close('all')
-
-		for index in range(0, 6):
-			plt.hist([X_train[:100000,index],images[:,0,index,0]], bins = 250,label=['real','gen'], histtype='step')
+			plt.hist([plot_data[:,index],images[:,0,index,0]], bins = 250,label=['real','gen'], histtype='step')
+			plt.xlabel(axis_titles[index])
 			plt.legend(loc='upper right')
 			if blue_crystal == True:
 				plt.savefig('/mnt/storage/scratch/am13743/low_memory_gan_out/%d/test_output/current_%d.png'%(file_number,index), bbox_inches='tight')
