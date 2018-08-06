@@ -298,7 +298,7 @@ class GAN(object):
 					if blue_crystal == True:
 						self.G.save('/mnt/storage/scratch/am13743/low_memory_gan_out/%d/test_output/models/Generator_neg13_x_x_best_rchi2.h5'%file_number)
 					else:
-						self.G.save('test_output/models/Generator_neg13_x_x.h5')
+						self.G.save('test_output/models/Generator_neg13_x_x_best_rchi2.h5')
 					best_bdt_rchi2 = bdt_rchi2_list[-1][1]
 
 				if bdt_sum_overlap_list[-1][1] < best_bdt_overlap:
@@ -312,7 +312,7 @@ class GAN(object):
 					if blue_crystal == True:
 						self.G.save('/mnt/storage/scratch/am13743/low_memory_gan_out/%d/test_output/models/Generator_neg13_x_x_best_overlap.h5'%file_number)
 					else:
-						self.G.save('test_output/models/Generator_neg13_x_x.h5')
+						self.G.save('test_output/models/Generator_neg13_x_x_best_overlap.h5')
 					best_bdt_overlap = bdt_sum_overlap_list[-1][1]
 
 	def plot_images(self, bdt_rchi2_list, t0, bdt_sum_overlap_list, list_for_np_choice, muon_weights, save2file=False, samples=16, step=0):
