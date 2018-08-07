@@ -43,7 +43,7 @@ class GAN(object):
 		# Default values currently set as best discovered combination of hyper parameters.
 
 		parser.add_argument('-l', action='store', dest='learning_rate', type=float,
-		                    help='learning rate', default=0.00005)
+		                    help='learning rate', default=0.0002)
 
 		parser.add_argument('-o', action='store', dest='optimizer_choice', type=int,
 							default = 0,
@@ -286,6 +286,11 @@ class GAN(object):
 				plt.close('all')
 
 				bdt_rchi2_list, bdt_sum_overlap_list = self.plot_images(bdt_rchi2_list, t0, bdt_sum_overlap_list, list_for_np_choice, muon_weights, save2file=True, step=cnt)
+
+				if blue_crystal == True:
+					self.G.save('/mnt/storage/scratch/am13743/low_memory_gan_out/%d/test_output/models/Generator_neg13_x_x_current.h5'%file_number)
+				else:
+					self.G.save('test_output/models/Generator_neg13_x_x_current.h5')
 
 				if bdt_rchi2_list[-1][1] < best_bdt_rchi2:
 					print('Saving best rchi2.')
