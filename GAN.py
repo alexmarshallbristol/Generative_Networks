@@ -1,3 +1,9 @@
+'''
+Generalised GAN
+ - Can be used for 4 and 6 features
+ - Requires defined storage and training sample locations
+ - Requires saving directory structure setup at storage location - see test_output folder in repo
+'''
 import numpy as np
 from keras.datasets import mnist
 from keras.layers import Input, Flatten, Dense, Reshape, Dropout
