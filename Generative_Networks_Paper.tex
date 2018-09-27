@@ -1,0 +1,372 @@
+\documentclass{article}
+\usepackage[utf8]{inputenc}
+\usepackage{authblk}
+% \usepackage[demo]{graphicx}
+\usepackage{subfig}
+
+\title{Fast Simulation of Muon Backgrounds at SHiP using Generative Networks}
+
+\author[1]{A. Marshall}
+\author[1]{K. Petridis}
+\author[2]{N. Serra}
+\affil[1]{HH Wills Physics Laboratory, University of Bristol}
+\affil[2]{Physics Institute, University of Zurich}
+
+\usepackage{natbib}
+\usepackage{graphicx}
+\usepackage{dirtree}
+\usepackage{geometry}
+\usepackage{siunitx}
+\usepackage{amssymb}
+
+\usepackage[table]{xcolor}% http://ctan.org/pkg/xcolor
+
+
+\geometry{legalpaper, portrait, margin=1in}
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+    We present a novel and fast approach to simulating muon backgrounds at SHiP. Through the use of generative networks we show we can accurately avoid a large bottleneck in the full SHiP simulation. We investigate and provide comparison between two popular modern generative network approaches from the machine learning community, Generative Adversarial Networks (GANs) and Varational Auto-encoders (VAEs). We conclude that the adversarial approach to training, GANs, can produce a more realistic output.  For the simulation requirements at SHiP we show generative networks are capable of accurately approximating the full simulation (Pythia8 and GEANT4) of the dense fixed target with a speed up of $\mathcal{O}(10^6)$. The model produced here has been implemented in the SHiP simulation software. Comparison of hits and track reconstruction in detectors of the bottleneck between generated and fully simulated data shows good alignment. Methods presented in this paper can be easily generalized and applied to modeling any non-discrete multi-dimensional distribution.
+\end{abstract}
+
+\section{Introduction}\label{intro}
+
+    Generative networks have been studied in the machine learning community primarily for image generation applications. Each image in a training set has hundreds or thousands of pixels representing a high dimensional space. Within this space underlying features of the image set are encoded through dependencies between pixels. Generative networks attempt to model these underlying distributions that define a specific set of training images. These models can then be used to generate fake images that one would struggle to separate from the training set. Generative networks have shown some astonishing results: generating high quality images that obey fundamental features of training set images \cite{radford2015unsupervised} \cite{gregor2015draw}, images from descriptive text \cite{zhang2017stackgan}, modeling image captions \cite{pu2016variational}, photo realistic super resolution images \cite{ledig2017photo} and high resolution images from semantic mapping \cite{wang2018high} \cite{isola2017image}.
+    
+    Current trends in high energy physics are seeing higher intensities across a range of experiments (SHiP and HL-LHC). This combined with a future increase in complexity of simulation software, will see simulation of high energy physics becoming exponentially more computationally expensive \cite{albrecht2018roadmap}. Generative networks of some form will be a useful tool in helping to provide a fast approach to simulation that can keep up with demands. 
+    
+    
+    Elements of high energy physics simulation can be seen as highly complex functions transforming an input to an output. The reach and shape of an output distribution is dependent on the input and details of the simulation which can include stochastic elements. Generative networks can provide accurate representations of these intractable functions, without any prior inference \cite{mirza2014conditional}.% \cite{louppe2017adversarial}. "Generative models based on neural networks are highly parametrized and the model parameters have no obvious interpretation. In contrast, scientific simulators can be thought of as highly regularized generative models as they typically have relatively few parameters and they are endowed with some level of interpretation. In this setting, inference on the model parameters $\theta$ is often of more interest than the latent variables $z$".
+    
+    Generative models have been applied to high energy physics. Current physical applications are in learning 2D energy distributions, with successful generation of 2D jet images \cite{de2017learning}, modeling showers in calorimeters \cite{erdmann2018precise} \cite{paganini2018accelerating}, modeling detector response and reconstruction algorithms \cite{musella2018fast} and learning features of jets \cite{monk2018deep}. 
+    
+    \begin{figure}[h!]
+    \centering
+    \includegraphics[width=0.7\textwidth,keepaspectratio]{SHiP.png}
+    \caption{SHiP geometry (2018)}
+    \label{SHiP}
+    \end{figure}
+    
+    The SHiP experiment is a general purpose beam dump facility at the SPS at CERN searching for very weakly interacting long lived particles \cite{ship1504technical}. Searching for new physics at the intensity frontier, SHiP plans to collide \num{4e13} 400 GeV protons on a dense W/Mo target (POT) over each 1s spill. This amounts to \num{2e20} POT integrated over the lifetime of the experiment. This extreme beam intensity induces a large muon background of ($\sim$ \num{4e11} muons/s) leaving the hadron absorber (see figure \ref{SHiP}). Background reduction is paramount at SHiP, the aim is to have $< 0.1$ background events over life of experiment. A complex optimized arrangement of magnets downstream of the hadron absorber acts as a sweeper, reducing the flux of muons at downstream detectors by $\mathcal{O}(10^{-6})$ \cite{akmete2017active}. Any muons breaking this shield must be well understood to optimize the design of and verify vetoing detectors and cuts. 
+    
+    The SHiP simulation contains a large bottleneck. Simulating 400 GeV protons on the dense W/Mo target is computationally expensive. A muon reaches the end of the hadron absorber every $\mathcal{O}(10^{3})$ POT. This takes $\mathcal{O}(5)$ minutes of CPU time, even after cutting any particle of energy $<10$ GeV. We teach generative networks the properties of muons that reach the end of the hadron absorber. When trained these networks can accurately approximate these slow simulation steps. Models quickly producing large samples of muons which can be fed into the full simulation after the bottleneck. 
+    
+    Add paragraph justifying the approach, why this is statistically valid to do. (shutting thomas up paragraph) - adapting training sample can allow us to understand dangerous muons. if we have a generated distribution in which we have over or underesstimated the tails - run loads and loads of this. The muons that break the shield we can assign a weight to: if they are from a p-pt bin we have overesstimated (understand this by comparing full sim to generated distributions) we can weight this muon down. CAN EVEN GET AN ERROR ON THAT WEIGHT
+    %https://cds.cern.ch/record/2280572/files/main.pdf fixed target note - thomas
+
+\section{Generative Models}
+
+    There are two popular generative network architectures explored in this paper, both of which are built of two neural networks and a latent space of random noise $z$ for generation. 
+
+    \subsection{Generative Adversarial Networks (GANs)}\label{GANs}
+    
+    %maybe use capital X and Y to avoid confusion with parameters x and y
+    
+        GANs employ two neural networks, the generator and the discriminator \cite{goodfellow2014generative}. The generator $G(z;\theta_g)$ maps a randomly generated latent space $z$ to a generated image $x_{gen}$ and has trainable parameters $\theta_g$. The discriminator $D(x;\theta_d)$ maps an input image $x$ to an output prediction $y$ (between 0 and 1) representing the probability $x$ was either from training sample $x_{real}$ or was a synthetic image from $G$, $x_{fake}$. See figure \ref{GAN-diagram}. In this configuration real data is labelled $1$ and generated data $0$. $D$ is trained in isolation to correctly assign predictions to $x_{gen}$ and $x_{real}$ labelled data via a binary crossentropy loss function,
+        \begin{equation}
+            L_d = -(log(y_{true}) + log(1 - y_{pred})),
+        \end{equation}
+        where $y_{true}$ is the true label of $x$ and $y$ is output of $D(x)$. $G$ is trained in a stacked model which directly connects output $x_{gen}$ of $G$ to $D$, in this stacked model all training parameters of $D$, $\theta_d$, are frozen. The trainable parameters of $G$, $\theta_g$ are updated based on the loss function tied to the output of $D$, 
+        \begin{equation}
+            L_g = -log(y_{pred}),
+        \end{equation}
+        where $y_{pred}$ is $D(x_{gen})$. The goal is for $G$ to produce $x_{gen}$ that is mislabeled by $D$ as real $x_{real}$ images from training sample ($y\simeq1$). $D$ and $G$ are iteratively trained as to improve together. Training is complete when generated samples $G(z)$ are indistinguishable from $x_{real}$.
+    
+    \subsection{Varational Auto-Encoders (VAEs)}\label{VAEs}
+    
+        %https://towardsdatascience.com/intuitively-understanding-variational-autoencoders-1bfe67eb5daf
+        %http://louistiao.me/posts/implementing-variational-autoencoders-in-keras-beyond-the-quickstart-tutorial/
+        %https://arxiv.org/pdf/1312.6114v10.pdf
+        
+        maybe using $\mu$ is confusing with muons?
+        
+        VAEs are also formed of two neural networks, the encoder $E(x;\theta_e)$ mapping sample images $x$ to a compressed latent space $z$ and the decoder $D(z;\theta_d)$ which maps $z$ back into images $x_{out}$, see figure \ref{VAE-diagram}. The distribution in $z$ is an encoded representation of the full sample.%, $z$ has fewer dimensions than $x$. 
+        
+        Importantly the VAE approach allows moulding of latent space $z$, the latent space representation is forced to be an uncorrelated multi-dimensional normal distribution. To achieve this the encoder $E(x;\theta_e)$ doesn't directly output $z$. Instead $E$ outputs two vectors $z_{\mu}$ and $z_{log(\sigma^2)}$ holding values representing the mean and log variance of a normal distribution. The $i$th component of $z$, $z^i$ is then sampled as (am i allowed to super script like this? i think maybe it looks way more messy than it needs to),
+        \begin{equation}\label{vae_z}
+            z^i = z_{\mu}^i + \epsilon\,\odot\,e^{(z_{log(\sigma^2)}^i / 2)},
+        \end{equation}
+        where $\epsilon = \mathcal{N} (0, 1)$. Simplistically the $z_{\mu}$ encoding defines where in $z$ space a specific sample $x$ should sit and the second term in equation \ref{vae_z} defines an possible region around that point. 
+        
+        The decoder then translates the encoded representation $z$ back to real space $x_{out}$. Output samples $x_{out}$ are then compared to corresponding inputs $x$ using a binary cross-entropy term $H$ in the loss function,
+        \begin{equation}\label{vae_loss}
+            L_v = H + D_{KL},
+        \end{equation}
+        where the second term $D_{KL}$ is the Kullback–Leibler divergence. 
+        \begin{equation}\label{vae_kl}
+            D_{KL}^i = -\frac{1}{2}\,\sum (1 + z_{log(\sigma^2)}^i - (z_{\mu}^i)^2 - e^{z_{log(\sigma^2)}^i}),
+        \end{equation}
+        which is small if dimensions of $z$ are close to $\mathcal{N} (0, 1)$. Having a loss function that is a combination of these two effects creates a continuous and meaningful latent space. $D_{KL}$ pushes the each dimension in $z$ space to target values of $\mu = 0$ and $\sigma = 1$ and closes gaps in latent space. The $H$ term in the loss function keeps $z$ well separated, that is, regions have meaning and similar inputs are clustered.
+        
+        To generate samples a value is generated from $\mathcal{N} (0, 1)$ for each dimension of latent space, $z$ is then passed through the decoder.
+        
+        % \cite{kingma2013auto} - KL divergence derivation appendix b
+    
+\section{Our Approach}   
+
+    \subsection{Full Simulation}
+    
+        A large simulation run ($\mathcal{O}(10^{11})$ POT) is completed of the target and hadron absorber complex by the SHiP collaboration with an un-magnetized hadron absorber \cite{ship1504technical}, see figure \ref{SHiP}. This simulation is run using Pythia8 \cite{sjostrand2015introduction} for 400 GeV protons on target, output particles are then transported using GEANT4 \cite{agostinelli2003geant4}. Mixed into this production are charm and beauty events from the SHiP cascade event generator \cite{dijkstra2015heavy}. Muons that reach the end of the hadron absorber are collected and kinematic information about the start of their tracks $S = [x,\:y,\:z,\:p_x,\:p_y,\:p_z]$ is saved. To simulate the rest of the experiment, muon tracks are started in the simulation of the full experiment at these same start of track kinematics $S$. It is this second simulation run that the hadron absorber is magnetized. The advantage of this modular approach to simulation is that after large simulation runs of the target the level of smear on the beam and the properties of a field in the hadron absorber can be changed, if the design changes. It is these 'start of track properties', $S$, of both $\mu^+$ and $\mu^-$ that we aim to generate. Our training sample is made up of \num{3.4e8} muons.
+    
+    \subsection{Pre-processing}
+
+        Start of muon track information $S$ is extracted from collaboration target simulation output files, $\mu^+$ and $\mu^-$ information is separated. A significant fraction of muons ($\sim55\%$) extracted have start $x = 0$ and $y = 0$, this introduces a non continuous feature into the $x$ and $y$ distributions. Typical generative networks struggle to accurately model discrete features. To deal with this the sample is split again into muons that start at (0,0) and those that do not. We now have 4 separate samples, see table \ref{save_table}.
+        
+        \begin{table}[h!]
+        \centering
+        \begin{tabular}{|c|c|l|l|l|l|l|l|}
+        \hline
+         Category &  Particle & \multicolumn{6}{l|}{Saved Properties} \\ \hline
+         1 & $\mu^+$ &  \cellcolor{green!25}$x\neq0$ &  \cellcolor{green!25}$y\neq0$ &  \cellcolor{green!25}$z$ &  \cellcolor{green!25}$p_x$ &  \cellcolor{green!25}$p_y$ &  \cellcolor{green!25}$p_z$ \\ \hline
+         2 & $\mu^+$ &  \cellcolor{red!25}$x = 0$ &  \cellcolor{red!25}$y = 0$ &  \cellcolor{green!25}$z$ &  \cellcolor{green!25}$p_x$ &  \cellcolor{green!25}$p_y$ &  \cellcolor{green!25}$p_z$ \\ \hline
+         3 & $\mu^-$ &  \cellcolor{green!25}$x\neq0$ &  \cellcolor{green!25}$y\neq0$ &  \cellcolor{green!25}$z$ &  \cellcolor{green!25}$p_x$ &  \cellcolor{green!25}$p_y$ &  \cellcolor{green!25}$p_z$ \\ \hline
+         4 & $\mu^-$ &  \cellcolor{red!25}$x = 0$ &  \cellcolor{red!25}$y = 0$ &  \cellcolor{green!25}$z$ &  \cellcolor{green!25}$p_x$ &  \cellcolor{green!25}$p_y$ & \cellcolor{green!25}$p_z$  \\ \hline
+        \end{tabular}
+        \caption {Saved muon properties from start of track information $S$ for each category sample.}\label{save_table}
+        \end{table}
+
+        Every muon in the training set is converted into a vector of 4 features (category 2 and 4) or 6 features (category 1 and 3). Two generative network structures are designed, one to train on 4 feature vectors and one for 6 feature vectors.
+
+        Real parameter values are normalized to create input training sets. Each sample is normalized separately with minimum and maximum values stored for conversion of generated output back to physical values. Feature values are normalized to values between -0.97 and 0.97. Our GAN output layer is fitted with a $tanh$ activation layer (see section \ref{GAN_arch}) moulding output values to between -1 and 1. (VAE is currently sigmoid - test with tanh) Having the input normalized slightly more tightly removes a restriction on output parameter values. 
+        
+        In the 6 feature case the features $x$ and $y$ are extremely peaked distributions, even after the split shown in table \ref{save_table}. This proves hard for these generative networks to model. We make the task easier by widening the distribution in a reversible manner. For each point in the distribution we take the distance from the mean, square root the modulus of this value then reapply the correct sign. This distribution is again normalized. The distribution is now wider and can be more accurately modeled. This shouldn't reduce how effectively a well trained model can understand correlations between features as the operation is smooth and reversible. 
+
+\section{Network Architecture and Optimization}
+
+    We run optimization tests on a small GPU cluster for 4 and 6 feature GANs and VAEs. We qualitatively run tests over hyper-parameter space running tests for significant periods of time before judging success of the hyper-parameter choice. We test performance over changes in number of nodes, number of layers, the learning rate and optimizer choice. During a training run we track progress of generated samples using the figure of merit described in section \ref{fom}. 
+    
+    All networks are trained with a mini-batch gradient descent approach, each training step the networks sees a small sample of training data. This is a hybrid approach between showing the full training sample each training step and showing just a single image each step (stochastic gradient descent) \cite{ruder2016overview}. Although showing the full training sample would be the most accurate approach is it very time consuming and inefficient. Showing small samples is fast and it also introduces a stochastic element to the training which can effectively kick a network out of the equivalent of a local minima. The hybrid mini-batch approach allows fast and accurate training. Batch size is another tunable parameter.
+    
+    In this paper both the GANs and VAEs only use dense fully connected layers. This, as opposed to any arrangement of convolutional layers is intuitively the correct approach. Filters in convolution layers instantly imply a positional dependence on features in muon parameter vectors. In generative networks for image applications this is useful, the positional relation of features are important. The networks in this case though should not have any prior expectation for this. The order that the vector $S = [x,\:y,\:z,\:p_x,\:p_y,\:p_z]$ is put together should not change the final result. 
+    
+    \subsection{Figure of Merit}\label{fom}
+    
+        The output of models is either 6 or 4 features, a high quality output sample should not only produce individual feature values in the correct distribution but also should have the correct correlations between features. In this high dimensional output space data points are sparse and traditional goodness of fit methods (e.g. $\chi^2$) break down as almost all bins have low occupancy. To combat this we train a boosted decision tree (BDT) to distinguish between generated muon samples and real muon samples, this acts similarly the discriminator $D$ of a GAN (section \ref{GANs}). The BDT is trained on a test sample of 50k real muons and a sample of 50k generated muons. After training the BDT can then be queried on an unseen 50k generated and an unseen 50k real samples, a traditional goodness of fit technique can then be applied to the 1 dimensional output distributions \cite{weisser2016machine}, for example see figure \ref{BDT_plot}. The properties of the BDT are chosen to provide a continuous output for full samples. $\chi^2/N_{dof}$ values calculating the similarity between distributions for real and generated samples in the 1D BDT output space can then be used as an accurate figure of merit (FOM). 
+        
+
+    \subsection{GAN Architecture}\label{GAN_arch}
+        
+        
+        The final GAN architecture for the 6 feature case is shown in figure \ref{GAN-diagram}. Both $G$ and $D$ have 2 hidden layers in an inverted pyramid structure, with the number of nodes being (1536, 3072) and (768, 1536) for $G$ and $D$ respectively. The architecture for the 4 feature case is similar having the same $D$, $G$ in the 4 feature case again has 2 hidden layers but less nodes at (512, 1024) and again in an inverted pyramid structure. The generators in both cases take an input of 100 dimensional latent space, where each dimension is a value sampled from $\mathcal{N} (0, 1)$. 
+        
+        Dropout layers are added between each dense layer to help prevent over fitting \cite{srivastava2014dropout}. Batch normalization is used between every layer of $G$, this can increase stability at higher learning rates and add regularization which can help prevent over fitting \cite{ioffe2015batch}. For successful architectures batch normalization was found to decrease performance when applied to layers in $D$.
+        
+        Leaky Rectified Linear Units activation layers are used at every hidden layer. The last layer of $G$ has a tanh activation function, this is in accordance to the training samples normalizations between -1 and 1. The last layer of $D$ has a sigmoid activation function providing an output between 0 and 1 representing the discriminator's judgment on the origin of the tested sample. 
+        
+        
+        Mode collapse is a common failure in GANs, where the generator locks onto one particularly successful output image which is able to constantly trick the discriminator, this single output acts like a local minimum. We try qualitatively test a stabilization technique and see no effect on output. The labels of both training and generated images are blurred with Gaussian noise of $\mu = 0$ and $\sigma = 0.3$, \cite{salimans2016improved}. The GAN gains stability when the job of $D$ is made harder \cite{sonderby2016amortised}. Even after multiple epochs we see no evidence of mode collapse or over fitting in GAN output, with or without this technique. This is due to our sample being very large and high entropy. 
+        
+        
+        % TESTING check FINAL_GANS_better_save6.
+        
+      
+        % Firstly the labels of both training and generated images are blurred with Gaussian noise of $\mu = 0$ and $\sigma = 0.3$, \cite{salimans2016improved} suggests only smearing positive labels (re-read). Secondly, the true values for muon parameters in the training sample are blurred with a very small amount of Gaussian noise ($\mu = 0$ and $\sigma = 0.001$) every time a mini-batch sample is created. The GAN gains stability when the job of $D$ is made harder \cite{sonderby2016amortised}. %These measures provide no clear increase in performance for this task.  
+        
+        We find the Adam optimizer to perform best for this network architecture \cite{kingma2014adam}. We find employing AMSgrad massively increased the stability of our output loss and FOM values \cite{reddi2018convergence}. The Adam optimizer has a tunable momentum controlling parameter $\beta_1$ that can be varied which is shown to provide mixed results, this paper uses $\beta_1 = 0.5$ as suggested by Radford et. al \cite{radford2015unsupervised}.
+        
+        \begin{figure}[h!]
+        \centering
+        \includegraphics[width=\textwidth,height=\textheight,keepaspectratio]{GAN.png}
+        \caption{GAN architecture, arrows indicate the flow of samples and loss information for each stage of training and generation.}
+        \label{GAN-diagram}
+        \end{figure}
+    
+    \subsection{VAE Architecture}
+        
+        Best found VAE structure is displayed in figure \ref{VAE-diagram}. This has an encoder $E$ with 2 hidden layers in a square structure both with 1250 nodes. The $\mu$, $log(\sigma^2)$ and $z$ layers have 5 and 3 dimensions for the 6 and 4 parameter cases respectively. The latent space representation of $x$ is of lower dimensions, $E$ must be efficient to effectively compress the information. In the final architecture the decoder $D$ has one hidden layer also of 1250 nodes. 
+        
+        Performance of this VAE is poor with the standard loss function in equation \ref{vae_loss}. The loss function is dominated by small natural fluctuations in the $D_{KL}$ term. To improve this we introduce a factor $\kappa$ to the loss function,
+        \begin{equation}\label{vae_loss_improved}
+            L_v = \kappa H + D_{KL},
+        \end{equation}
+        where $\kappa$ controls the relative importance of each term. We find a high value of $\kappa \gtrsim 1000$ to massively improve the performance of the VAE, the output more faithfully represents the input and the latent space remains as a multivariate Gaussian. Convergence time increases as $\kappa$ increases, this demonstrates the dominance of the $D_{KL}$ term when $\kappa = 1$. 
+    
+        We find VAE performance to be less architecture dependent than that of the GAN. VAE performance is observed to be mostly consistent over significant changes of in number of nodes in each layer. However the performance of VAE was found across a wide range of hyper-parameters to under perform relative to the best GAN architectures.
+
+        \begin{figure}[h!]
+        \centering
+        \includegraphics[width=\textwidth,keepaspectratio5]{VAE.png}
+        \caption{VAE architecture. Sample generation process is shown separately.}
+        \label{VAE-diagram}
+        \end{figure}
+    
+
+\section{Method Comparison}\label{comparison}
+    
+    \subsection{Compare}
+
+        We can judge generated output qualitatively with visual inspection of generated data plotted against full simulation data. This can be comparing both 1D histograms of feature output values or 2D histogram between each unique pairs of features, in the 2D histograms there is information about how well the network is grasping the correlations between parameters. We can also judge quantitatively looking for alignment in output from our figure of merit (section \ref{fom}). 
+        
+        We find that our most successful GAN architecture, given enough training time, outperforms any tested VAE architecture. We can qualitatively understand the improvement to come from the adversarial component of the GAN. All the VAE has to learn from is the value of the loss function, but this loss function encodes both the requirement for a multivariate Gaussian latent space as well as accurate reconstruction of initial image. All VAE training information rolled into single value. For each training step the value for the loss is computed comparing an input batch to output batch, where the output batch (when $\mu\sim0$ and $\sigma\sim1$) no longer has a connection to the input encoded space, all variation comes from  $\epsilon = \mathcal{N} (0, 1)$. High quality generated samples can still produce a large loss value. In the GAN approach this is not the case.
+        
+        % POSSIBLE VERY LARGE BATCH SIZE CAN BE BETTER FOR VAE.
+        
+        The GAN takes longer to reach optimal values for the FOM. Training can sometimes have slow improvement for a while, before wild improvement probably due to $D$ finally grasping a correlation/characteristic of the training sample. 
+    
+        From here on we will focus solely on the higher quality generated data from the GAN architecture described in section \ref{GAN_arch} and shown in figure \ref{GAN-diagram}.
+        
+        %CHERRYPICKED?
+        
+\section{GAN Generated Sample}
+
+    The BDT figure of merit output plots for the final GAN models chosen for generation in this paper are presented in figure \ref{BDT_plot}. A full generated sample is prepared by combining output from this 4 GANs in the correct physical production fractions.
+
+
+        \begin{figure}[h!]
+        \centering
+        \includegraphics[scale=0.5]{BDT_out_regular.png}
+        \caption{Distributions of BDT output values for both generated and full simulation samples. Results are separated for each of the 4 GAN generators used to generate data for this paper. 
+        % very low values are not just very low p muons, see /Users/am13743/Desktop/GANs/final_gan_models/plots/bad_bdt*
+        }
+        \label{BDT_plot}
+        \end{figure}
+
+        \subsection{Comparison to Training Sample}\label{compare}
+        
+            The training sample (full simulation) has some muon production channels enhanced by a factor of 100, namely vector meson decays and $\gamma$ conversion. Weights are taken into account in the training of the GAN to negate this effect, the GAN produces muons from different sources in the correct physical ratios. In all comparison plots in this paper (excluding figures \ref{fairship_non_log} and \ref{track_mom}) muons are sampled from the training sample in the physically correct proportions as to make comparison possible. 
+            
+            
+            A one dimensional comparison of each of the 6 features of the muons is made between the full simulation and generated data in figure \ref{1D_hists} (REMOVED). Figure \ref{mom_plot} combines features plotting total momentum of each muon and transverse momentum of each muon, the alignment here displays how well the GAN understands the correlations between parameters. Figures \ref{2d}(a) and \ref{2d}(b) display directly appreciable physical correlations between features. Figure \ref{2d}(b) displays the x and y position of the start of tracks, and figure \ref{2d}(a) shows how similar generated and full simulation samples are in momentum phase space. 
+        
+        
+            \begin{figure}[h!]
+            \centering
+            \includegraphics[scale=0.8]{momentum_er.png}
+            \caption{Distributions of total momentum and transverse momentum of both the full simulation and GAN generated sample at the start of muon tracks.}
+            \label{mom_plot}
+            \end{figure}
+    
+    
+            % \begin{figure}[h!]
+            % \centering
+            % \includegraphics[width=0.5\textwidth,keepaspectratio]{test_mom.png}
+            % \caption{Distribution of muons on a plot of total momentum against transverse momentum at the start of muon tracks. Plotted are both the full simulation and GAN generated samples.}
+            % \label{2dmom_plot}
+            % \end{figure}
+            % \begin{figure}[h!]
+            % \centering
+            % \includegraphics[width=0.5\textwidth,keepaspectratio]{test2d_xy.png}
+            % \caption{Distribution of $x$ and $y$ position of muons at the start of their tracks.}
+            % \label{xy_plot}
+            % \end{figure}
+            
+
+            
+            \begin{figure}%\
+            \centering
+            \subfloat[]{{\includegraphics[width=0.8\textwidth,keepaspectratio]{test_mom.png} }}%
+            \qquad
+            \subfloat[]{{\includegraphics[width=0.46\textwidth,keepaspectratio]{test2d_xy.png} }}%
+            \qquad
+            \subfloat[]{{\includegraphics[width=0.46\textwidth,keepaspectratio]{test2d_xy_with_smearing.png} }}%
+            \qquad
+            \subfloat[]{{\includegraphics[width=0.8\textwidth,keepaspectratio]{total_mom_z.png} }}%
+            \caption{(a) Distribution of muons on a plot of total momentum against transverse momentum at the start of muon tracks. Plotted are both the full simulation and GAN generated samples. (b) Distribution of $x$ and $y$ position of muons at the start of their tracks. (c) Distribution of $x$ and $y$ position after a realistic beam smearing has been applied. (d) Distribution in a plot of total momentum against $z$ start position, where high $z$ is downstream. (NOTE: high Z muons have very low mom - safe)}%
+            \label{2d}%
+            \end{figure}
+                    
+%G_pos13_x_x = load_model('/mnt/storage/scratch/am13743/MOMENTUM_GANs/4/pos_x/test_output/models/Generator_pos13_x_x_best_rchi2_mom.h5', custom_objects = {'_loss_generator':_loss_generator})
+% G_pos13_0_0 = load_model('/mnt/storage/scratch/am13743/MOMENTUM_GANs/1/pos_0/test_output/models/Generator_pos13_0_0_best_rchi2_mom.h5', custom_objects = {'_loss_generator':_loss_generator})
+% G_neg13_x_x = load_model('/mnt/storage/scratch/am13743/MOMENTUM_GANs/3/neg_x/test_output/models/Generator_neg13_x_x_best_rchi2_mom.h5', custom_objects = {'_loss_generator':_loss_generator})
+% G_neg13_0_0 = load_model('/mnt/storage/scratch/am13743/MOMENTUM_GANs/1/neg_0/test_output/models/Generator_neg13_0_0_best_rchi2_mom.h5', custom_objects = {'_loss_generator':_loss_generator})
+        
+        
+            
+            % \begin{figure}[h!]
+            % \centering
+            % \includegraphics[scale=0.5]{1D.png}
+            % \caption{PLOT JUST Z maybe}
+            % \label{1D_hists}
+            % \end{figure}
+    
+        
+        \subsection{Benchmarking}
+        
+            As mentioned in section \ref{intro}, in the full simulation one muon leaves the hadron absorber every $\mathcal{O}(5)$ minutes on a single CPU. With only a small expense in the fidelity of the generated sample GANs can produce data a lot faster. We measure a speed up of $\mathcal{O}(10^6)$. This is running with Keras (v2.1.5) on a Tensor Flow backend (v1.8.0) all on a single Nvidia Pascal P100 GPU card. This speed up figure includes all computation required to un-normalize the GAN output back into physical values. Generation using GANs is an order of magnitude slower on CPU. 
+            
+            \begin{figure}[h!]
+            \centering
+            \includegraphics[scale=0.5]{benchmark.png}
+            \caption{Plot of time for production against muon background simulated for POT equivalent. Assuming 1 muon with energy is higher than the 10 GeV cut leaving the hadron absorber represents 750 POT.}
+            \label{benchmark}
+            \end{figure}
+            
+\section{Tails of distribution and adaptations to training sample}
+
+    Dope the GAN to generate potentially dangerous regions
+    
+
+
+\section{Using Generated Sample in FairShip}
+    % use this %https://github.com/ShipSoft/FairShip/releases
+    
+    To further verify the success of the GANs in generating a sample that accurately represents the fully simulated training sample, we run the generated sample through the rest of the SHiP simulation (after the bottleneck). We start $\mu^+$ and $\mu^-$ tracks at generated positional values with generated kinematics and transport these muons down the experiment with Geant4. We track hits in downstream sensitive volumes and detectors. Hit maps for these volumes in runs of both generated and full simulation muons are displayed in figure \ref{fairship_non_log}. The enhancement effect mentioned in section \ref{compare} means some hits in these full simulation maps are weighted up by a large factor. These hit maps are some what normalized to this effect and z axes are matched, but the enhancement causes the real sample hit maps to be less smooth. After accounting for this in the judgment of alignment it is clear figure \ref{fairship_non_log} shows off a success in the accuracy of the generated sample. 
+    
+    Classification of signal and background muons uses reconstructed track properties from hits in the strawtubes at the end of the decay volume in the SHiP geometry. GAN generated muons must also produce tracks here that are physically accurate and comparable to those of the full simulation muons. Figure \ref{track_mom} shows a histogram of reconstructed track momentum. Generated muons inducing such a good response from the reconstructed tracks is evidence that GAN generated muons faithfully represent the training sample. The muons must be starting with physically correct kinematics, propagating correctly through detector and creating physically realistic tracks. Agreement between full simulation and generated muons here demonstrates that the GAN generated samples really are high enough quality to be usable to gain statistics and training data for background studies. 
+    
+    % fittrack momentum comparison plot
+    
+    
+    % need to understand the represented POT. in the p pt plot at low p there is a cut off region in the real data, not in the generated
+    
+            \begin{figure}[h!]
+            \centering
+            \includegraphics[scale=0.15]{fairship_non_log.png}
+            \caption{Hit maps in downstream sensitive volumes of the SHiP simulation software. Effects of GAN generated muons and full simulation muons on detectors can be compared. NEED TO REMAKE THIS FIGURE WHEN DONE WITH GAN}
+            \end{figure}\label{fairship_non_log}
+            
+            \begin{figure}[h!]\label{track_mom}
+            \centering
+            \includegraphics[scale=0.15]{track_mom.png}
+            \caption{Reconstructed track momentum values for GAN generated and full simulation muons.}
+            \label{track_mom}
+            \end{figure}
+
+
+
+\section{Discussion and Conclusion}
+
+We have used modern machine learning methods to approximate the output of a complex and computationally expensive target simulation at the SHiP experiment. We show it is possible to create models that extremely accurately model training data, without prior inference these models can understand complex correlations and characteristics. These techniques produce unique samples unseen in the training data that obey all features of the real sample. 
+
+We have shown that generated muons behave correctly when fed into the full experiment simulation after the bottleneck. The output is physically correct and comparable to the full simulation. 
+
+Add paragraph justifying method and shutting thomas up.
+
+If we are to assume that the kinematic phase space covered by the training data is representative of the full reach of muons leaving the hadron absorber from 400 GeV proton collisions, then so is the output of the GANs. If we assume this to be correct we can rely on huge muon production from these GANs as being representative.  
+
+The generative models developed in this paper can produce muons $\mathcal{O}(10^{6})$ times faster than the full target simulation. This can offer a huge increase in understanding of statistically limited muon background studies at SHiP. 
+
+On a more general note, we show methods of using generative networks to approximate bottlenecks in a particle physics simulations. We discount VAEs for this particular application, finding GANs to produce much higher quality generated results. We demonstrate pre-processing ideas that both lead to increases in generated performance and are are easily implementable. It is clear that GANs can offer a good solution to quickly sampling from complicated intractable high dimensional distributions. 
+
+\section{Acknowledgement}
+
+We would firstly like to thank the SHiP collaboration. Secondly, this work was carried out using the computational facilities of the Advanced Computing Research Centre, University of Bristol - http://www.bristol.ac.uk/acrc/. A Titan Xp was also used for this research which was donated by the NVIDIA Corporation. 
+% Use of the ACRC facilities constitutes agreement to provide the ACRC with details of any publications concerning research conducted using ACRC facilities. We ask that you do this by linking any publications that you enter into Pure, where an element of the research was undertaken using BlueCrystal, to the HPC facility which is detailed in Pure under Equipment. (From the Research Output screen, go to the Relations section, select Equipment and enter HPC.) Future funding for the ACRC facilities is dependent on our being able to demonstrate the number and range of publications being produced through use of BlueCrystal .
+
+% Postgrads who do not yet have a Pure personal user account can apply via this link - http://www.bristol.ac.uk/red/research-policy/pure/support/accessform-pg.html.
+
+\bibliographystyle{plain}
+\bibliography{references}
+
+\end{document}
+   % root -l /eos/experiment/ship/user/truf/muonBackground-2018/ship.conical.MuonBack-TGeant4-0-66000_rec.root
+    % cbmsim->Draw("strawtubesPoint.fY:strawtubesPoint.fX","strawtubesPoint.fZ < 2700","COLZ")
+    % cbmsim->Draw("ShipRpcPoint.fY:ShipRpcPoint.fX","ShipRpcPoint.fPdgCode==-13 | ShipRpcPoint.fPdgCode==13","COLZ")
+    % cbmsim->Draw("vetoPoint.fY:vetoPoint.fZ","vetoPoint.fPdgCode==-13 | vetoPoint.fPdgCode==13","COLZ")
+    % cbmsim->Draw("vetoPoint.fX:vetoPoint.fZ","vetoPoint.fPdgCode==-13 | vetoPoint.fPdgCode==13","COLZ")
+    % cbmsim->Draw("vetoPoint.fY:vetoPoint.fX","vetoPoint.fPdgCode==-13 | vetoPoint.fPdgCode==13","COLZ")
+    % cbmsim->Draw("strawtubesPoint.fY:strawtubesPoint.fX","strawtubesPoint.fPdgCode==-13 | strawtubesPoint.fPdgCode==13","COLZ")
+    % cbmsim->Draw("strawtubesPoint.fY:strawtubesPoint.fZ","strawtubesPoint.fPdgCode==-13 | strawtubesPoint.fPdgCode==13","COLZ")
+    % cbmsim->Draw("strawtubesPoint.fX:strawtubesPoint.fZ","strawtubesPoint.fPdgCode==-13 | strawtubesPoint.fPdgCode==13","COLZ")
+    
+    % cbmsim->Draw("strawtubesPoint.fPy:strawtubesPoint.fX","strawtubesPoint.fPdgCode==-13 | strawtubesPoint.fPdgCode==13","COLZ")
+    % remember this will be slightly different because our sample is not weighted at all. 
+    
+    % cbmsim->Draw("strawtubesPoint.fX:strawtubesPoint.fZ","strawtubesPoint.fPdgCode==-13 | strawtubesPoint.fPdgCode==13","COLZ")
+    
+%     neg_x 6222950, 6
+% pos_x 5035390
+% pos_0 2478943
+% neg_0 2829153
