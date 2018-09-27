@@ -1,3 +1,8 @@
+'''
+Pre-processing script combining multiple fragments of full simulation data.
+Also combines min and max files to get overall min-max.
+This file is no longer used as pre-processing the full data sample must be computed on a cluster.
+'''
 import numpy as np
 import glob
 import matplotlib as mpl
